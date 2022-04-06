@@ -1,0 +1,33 @@
+team_names :[ "ASC" "BHSU" "CCU" "CSC" "CSM" "CSUP" "FLC" "MSC" "MSCD" "NMHU" "RU" "UCCS"]
+
+
+pod_hosts: ["ASC" "BHSU" "CCU" "CSC" "CSM" "CSUP" "FLC" "MSC" "MSCD" "NMHU" "RU" "UCCS"]
+
+
+! Divisions
+east_division: ["CSC" "CSM" "MSCD" "RU" "UCCS" "BHSU"]
+west_division: ["ASC" "CSUP" "FLC" "MSC" "NMHU" "CCU"]
+
+
+! Weather Matrices
+cold_weather: ["ASC" "CSC" "CSM" "UCCS" "BHSU"]
+warm_weather: ["CCU" "CSUP" "FLC" "MSC" "MSCD" "NMHU" "RU"]
+
+
+non_pod_weekends: [1 2 3 4 5 6 8 9 10]
+
+
+! Far teams
+
+F_ASC: ["MSC" "CSC" "BHSU"]
+F_CSC: ["ASC" "MSC" "NMHU" "FLC"]
+F_CSM: ["ASC" "MSC" "CSC" "NMHU" "FLC" "BHSU"]
+F_CSUP: ["NMHU" "FLC" "MSC" "CSC" "BHSU"]
+F_FLC: ["CSC" "BHSU"]
+F_MSC: ["NMHU" "CSC" "BHSU"]
+F_MSCD: ["ASC" "MSC" "CSC" "NMHU" "BHSU" "FLC"]
+F_NMHU: ["RU" "MSC" "CSC" "BHSU"]
+F_RU: ["ASC" "MSC" "CSC" "FLC" "BHSU" "NMHU"]
+F_UCCS: ["ASC" "NMHU" "MSC" "CSC" "FLC" "BHSU"]
+F_BHSU: ["UCCS" "CSUP" "MSC" "ASC" "NMHU" "FLC"]
+F_CCU: ["ASC" "MSC" "CSC" "NMHU" "FLC" "BHSU"]

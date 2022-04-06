@@ -1,0 +1,471 @@
+model SoftBall
+  uses "mmxprs"
+  uses "mmsystem"
+  uses "mmnl"
+
+  ! =========== Model Configuration ===========
+
+  cutoff := 200 ! Seconds untill termination.
+
+  ! Initialisations from ....
+
+  input_path := "new_input.dat"
+
+  extension_path := "extensions_base2022.dat"
+
+  running_extensions := true
+
+  ! =========== END Model Configuration  ===========
+
+  declarations
+
+    teams = 1..12
+    team_names: SET of string
+
+    num_weeks = 10
+    weekends = 1..num_weeks
+
+
+    ! 1-yes, 0 - no
+    pod_hosts: SET of string
+    east_division: SET of string
+    west_division: SET of string
+    cold_weather: SET of string
+    warm_weather: SET of string
+    F_ASC: SET of string
+    F_CSC: SET of string
+    F_CSM: SET of string
+    F_CSUP: SET of string
+    F_FLC: SET of string
+    F_MSC: SET of string
+    F_MSCD: SET of string
+    F_NMHU: SET of string
+    F_RU: SET of string
+    F_UCCS: SET of string
+    F_CCU: SET of string
+    F_BHSU: SET of string
+
+    ! 1- non pod, 0 - pod
+    non_pod_weekends: SET of real
+
+
+
+    !--- decision variables ----
+
+    !Hosting non-pod weekends
+    ! team i @ team j on a non-pod weekend k
+    X: array(team_names, team_names, non_pod_weekends) of mpvar
+
+    ! pod weeknds
+    ! team i versus team j @ a pod hosted by team p
+    Y: array(team_names, team_names, pod_hosts) of mpvar
+
+    ! team i plays at pod hosted by team p
+    Z: array(team_names, pod_hosts) of mpvar
+
+    ! team p hosts a pod
+    W: array(team_names) of mpvar
+
+    ! ---- Penalty Variables -----
+    ! team i has 2 home games in a row starting in week k
+    a: array(team_names, non_pod_weekends) of mpvar
+
+    ! 1 if team i has a home game then hosts a pod
+    b: array(pod_hosts) of mpvar
+
+    ! 1 if team i hosts a pod then has a home game
+    c: array(pod_hosts) of mpvar
+
+  end-declarations
+
+
+
+  initialisations from input_path
+    team_names pod_hosts east_division west_division cold_weather warm_weather non_pod_weekends
+    F_ASC F_CSC F_CSM F_CSUP F_FLC F_MSC F_MSCD F_NMHU F_RU F_UCCS F_BHSU F_CCU
+  end-initialisations
+
+
+  !---- Binary Constraints -------------
+
+  ! team i @ team j on a non-pod weekend k
+  forall(i in team_names) do
+      forall(j in team_names) do
+        forall(k in non_pod_weekends ) do
+          X(i,j,k) is_binary
+          end-do
+      end-do
+  end-do
+
+  ! team i @ team j at a pod hosted by team p
+  forall(i in team_names) do
+      forall(j in team_names) do
+        forall(p in pod_hosts) do
+          Y(i,j,p) is_binary
+          end-do
+      end-do
+  end-do
+
+  ! team i plays at pod hosted by team p
+  forall(i in team_names) do
+      forall(p in pod_hosts) do
+        Z(i,p) is_binary
+      end-do
+  end-do
+
+  ! team p hosts a pod
+  forall(p in pod_hosts) do
+    W(p) is_binary
+  end-do
+
+  ! team i hosts two games in a row, starting from non-pod weekend k
+  forall(i in team_names, k in non_pod_weekends) do
+    a(i,k) is_binary
+  end-do
+
+
+  forall(p in pod_hosts) do
+    c(p) is_binary
+  end-do
+
+  forall(p in pod_hosts) do
+    b(p) is_binary
+  end-do
+
+  ! ----- The Constraints ----------------
+
+
+  ! (1)  Each nonpod weekend, a team plays exactly one other team, either home or away
+  forall(k in non_pod_weekends) do
+    forall(i in team_names) do
+      sum(j in team_names | i<>j) X(i,j,k) + sum(j in team_names | i<>j) X(j,i,k) = 1
+    end-do
+  end-do
+
+  ! (2) Each team plays every other team once during the season, either at home, away or in a pod(home or away)
+  forall(i in team_names) do
+    forall( j in team_names | i<>j) do
+      sum(k in non_pod_weekends) (X(i,j,k) + X(j,i,k)) + sum(p in pod_hosts) Y(i,j,p) = 1
+    end-do
+  end-do
+
+  ! (6) A team either starts or finishes the season at home
+  forall (j in team_names) do
+    sum(i in team_names | i<>j) (X(i,j,1) + X(i,j,10)) =1
+  end-do
+
+
+  ! (7) Sanity Check: if team i plays team j in a pod, then team j plays team i in the same pod
+  forall(p in pod_hosts) do
+    forall(i in team_names) do
+      forall(j in team_names | i<>j) do
+        Y(i,j,p) = Y(j,i,p)
+      end-do
+    end-do
+  end-do
+
+  ! (8) In a Pod, each team plays two other teams
+  forall(i in team_names) do
+    forall (p in pod_hosts) do
+      sum(j in team_names | i<>j) Y(i,j,p) = 2*Z(i,p)
+    end-do
+  end-do
+
+
+  ! (9) Exactly five home series for a team
+  forall(i in team_names) do
+    sum(j in team_names, k in non_pod_weekends | i<>j) X(j,i,k) + 2*W(i) = 5
+  end-do
+
+  ! (10) Three schools host a pod on the pod weekend
+  sum(p in pod_hosts) W(p) = 3
+
+  ! (11) Four teams playing in a pod game
+  forall(p in pod_hosts) do
+    sum(i in team_names) Z(i,p) = 4*W(p)
+  end-do
+
+  ! (12) One the pod weekend they play in a pod
+  forall (i in team_names) do
+    sum(p in pod_hosts) Z(i,p) = 1
+  end-do
+
+  ! (13) If a team hosts a pod it plays in that pod
+  forall(p in pod_hosts) do
+    forall(i in team_names | i = p) do
+      W(p) <= Z(i,p)
+    end-do
+  end-do
+
+  ! (14) For all teams in the east division, we prevent them from playing another team in the east division in a pod
+  forall(i in east_division) do
+    forall(p in pod_hosts) do
+      sum(j in east_division | i<>j) Y(i,j,p) = 0
+    end-do
+  end-do
+
+  ! (15)For  all teams in the west division, we prevent them from playing another team in the west division in a pod
+  forall(i in west_division) do
+    forall(p in pod_hosts) do
+      sum(j in west_division | i<>j) Y(i,j,p) = 0
+    end-do
+  end-do
+
+
+  ! (16)  For the first four weekends, force cold weather schools to play away at least twice
+  forall (i in cold_weather) do
+    sum(j in warm_weather)( X(i,j,1) + X(i,j,2) + X(i,j,3) + X(i,j,4) ) >= 2
+  end-do
+
+
+  ! (17) Warm weather schools must play at home or at another warm weather school at least twice
+  forall(i in warm_weather) do
+    sum(j in team_names | i<>j) (X(j,i,1) + X(j,i,2) +X(j,i,3) + X(j,i,4)) + sum(j in warm_weather | i<>j)(X(i,j,1) + X(i,j,2) + X(i,j,3)+ X(i,j,4)) >=2
+  end-do
+
+  !(18) No 2 far away games in a consequitve non-pod weekend
+  forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_ASC)( X("ASC", j, k) + X("ASC", j, k+1)) <= 1
+  end-do
+
+  forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_CSC)( X("CSC", j, k) + X("CSC", j, k+1)) <= 1
+  end-do
+
+  forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_CSM)( X("CSM", j, k) + X("CSM", j, k+1))<= 1
+  end-do
+
+  forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_CSUP)( X("CSUP", j, k) + X("CSUP", j, k+1)) <= 1
+  end-do
+
+  forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_FLC)( X("FLC", j, k) + X("FLC", j, k+1))<= 1
+  end-do
+
+  forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_MSC)( X("MSC", j, k) + X("MSC", j, k+1))<= 1
+  end-do
+
+  forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_MSCD)( X("MSCD", j, k) + X("MSCD", j, k+1))<= 1
+  end-do
+
+  forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_NMHU)( X("NMHU", j, k) + X("NMHU", j, k+1))<= 1
+  end-do
+
+  forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_RU)( X("RU", j, k) + X("RU", j, k+1))<= 1
+  end-do
+
+   forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_UCCS)( X("UCCS", j, k) + X("UCCS", j, k+1))<= 1
+  end-do
+
+   forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_CCU)( X("CCU", j, k) + X("CCU", j, k+1))<= 1
+  end-do
+
+ forall(k in [1,2,3,4,5,8,9]) do
+    sum(j in F_BHSU)( X("BHSU", j, k) + X("BHSU", j, k+1))<= 1
+  end-do
+
+  ! (19) If a team plays far away the week before a pod, it will not play at a pod far away
+  sum(p in F_ASC) Z("ASC", p) + sum(j in F_ASC) X("ASC", j, 6) <= 1
+  sum(p in F_CSC) Z("CSC", p) + sum(j in F_CSC) X("CSC", j, 6) <= 1
+  sum(p in F_CSM) Z("CSM", p) + sum(j in F_CSM) X("CSM", j, 6) <= 1
+  sum(p in F_CSUP) Z("CSUP", p) + sum(j in F_CSUP) X("CSUP", j, 6) <= 1
+  sum(p in F_FLC) Z("FLC", p) + sum(j in F_FLC) X("FLC", j, 6) <= 1
+  sum(p in F_MSC) Z("MSC", p) + sum(j in F_MSC) X("MSC", j, 6) <= 1
+  sum(p in F_MSCD) Z("MSCD", p) + sum(j in F_MSCD) X("MSCD", j, 6) <= 1
+  sum(p in F_NMHU) Z("NMHU", p) + sum(j in F_NMHU) X("NMHU", j, 6) <= 1
+  sum(p in F_RU) Z("RU", p) + sum(j in F_RU) X("RU", j, 6) <= 1
+  sum(p in F_UCCS) Z("UCCS", p) + sum(j in F_UCCS) X("UCCS", j, 6) <= 1
+  sum(p in F_CCU) Z("CCU", p) + sum(j in F_CCU) X("CCU", j, 6) <= 1
+  sum(p in F_BHSU) Z("BHSU", p) + sum(j in F_BHSU) X("BHSU", j, 6) <= 1
+
+  ! (20) If a team plays far away the week after a pod, it will not play at a pod far away
+  sum(p in F_ASC) Z("ASC", p) + sum(j in F_ASC) X("ASC", j, 8) <= 1
+  sum(p in F_CSC) Z("CSC", p) + sum(j in F_CSC) X("CSC", j, 8) <= 1
+  sum(p in F_CSM) Z("CSM", p) + sum(j in F_CSM) X("CSM", j, 8) <= 1
+  sum(p in F_CSUP) Z("CSUP", p) + sum(j in F_CSUP) X("CSUP", j, 8) <= 1
+  sum(p in F_FLC) Z("FLC", p) + sum(j in F_FLC) X("FLC", j, 8) <= 1
+  sum(p in F_MSC) Z("MSC", p) + sum(j in F_MSC) X("MSC", j, 8) <= 1
+  sum(p in F_MSCD) Z("MSCD", p) + sum(j in F_MSCD) X("MSCD", j, 8) <= 1
+  sum(p in F_NMHU) Z("NMHU", p) + sum(j in F_NMHU) X("NMHU", j, 8) <= 1
+  sum(p in F_RU) Z("RU", p) + sum(j in F_RU) X("RU", j, 8) <= 1
+  sum(p in F_UCCS) Z("UCCS", p) + sum(j in F_UCCS) X("UCCS", j, 8) <= 1
+  sum(p in F_CCU) Z("CCU", p) + sum(j in F_CCU) X("CCU", j, 8) <= 1
+  sum(p in F_BHSU) Z("BHSU", p) + sum(j in F_BHSU) X("BHSU", j, 8) <= 1
+
+
+  ! -- Teams should play home AT LEAST once in 3 consequtive weeks ------
+  
+  ! (21) Teams play home at least once in 3 weeks in the slots outside
+  forall(k in [1,2,3,4,8]) do
+    forall(i in team_names) do
+      sum(j in team_names | i<>j)(X(j,i,k) + X(j,i,k+1) + X(j,i,k+2))  >= 1
+    end-do
+  end-do
+
+  ! (22)
+  forall(i in team_names) do
+    (W(i) + sum(j in team_names | i<>j)(X(j,i,5) + X(j,i,6))) >= 1
+  end-do
+
+  ! (23)
+  forall(i in team_names) do
+    (W(i) + sum(j in team_names | i<>j) (X(j,i,6) + X(j,i,8))) >= 1
+  end-do
+
+  ! (24)
+  forall(i in team_names) do
+    (W(i) + sum(j in team_names | i<>j) (X(j,i,8) + X(j,i,9))) >= 1
+  end-do
+  ! ---  END   Teams should play home AT LEAST once in 3 consequtive weeks -----------
+
+
+ ! =========== Extensions ========================
+
+  declarations
+    ! 1 - we want this preference, 0 - we prefer not to
+    Home_Preference_None: array(team_names,weekends) of real
+
+    ! 1 - unavailable at home, must play away
+    Home_Unavailibility_None: array(team_names,weekends) of real
+
+    ! Budget declarations
+    Budget: array(team_names) of real
+    Travel_Cost_Matrix: array(team_names,team_names) of real
+
+    ! Decsion variables declarations
+    hp_penalty: array(team_names, weekends) of mpvar
+    ap_penalty: array(team_names, weekends) of mpvar
+  end-declarations
+
+  if(running_extensions)then
+    writeln("Running Extensions")
+
+    initialisations from extension_path
+      Home_Unavailibility_None Home_Preference_None Travel_Cost_Matrix
+      Budget as "Travel_budget_7"
+    end-initialisations
+
+    ! --- Unavailability Constraints
+    forall(k in weekends|k<>7) do
+      forall(j in team_names) do
+        sum(i in team_names | i<>j)X(j,i,k) + Home_Preference_None(j,k) <= hp_penalty(j,k) + 1
+      end-do
+    end-do
+
+    ! i has to play away if unavailibility equals 1
+    forall(k in weekends|k<>7)do
+      forall(j in team_names)do
+        sum(i in team_names | i<>j) X(i,j,k) >= Home_Unavailibility_None(j,k)
+      end-do
+    end-do
+
+    ! - Budget Constraint for away games
+    forall(i in team_names)do
+      sum(k in weekends|k<>7) sum(j in team_names | i<>j) (X(i,j,k)*Travel_Cost_Matrix(j,i)) <= Budget(i)
+    end-do
+
+
+  end-if
+  ! ======== END EXTENSIONSIONS ==========
+
+
+  ! ============ Objective Function --------------------------------------
+
+  !(3) Penalize j hosting two home games in a row
+  forall(k in [1,2,3,4,5,8,9]) do
+    forall(j in team_names) do
+      sum(i in team_names | i <> j)(X(i,j,k) + X(i,j,k+1)) <= a(j,k) + 1
+    end-do
+  end-do
+
+  !(4) Penalize hosting a pod after hosting at home
+  forall(p in pod_hosts) do
+    (W(p) + sum(j in team_names| j <> p) X(j,p,6)) <= b(p) + 1
+  end-do
+
+  !(5) Penalize hosting a home game after hosting a pod
+  forall(p in pod_hosts) do
+    (W(p) + sum(j in team_names | p <> j) X(j,p,8))  <= c(p) + 1
+  end-do
+
+  penA:= sum(i in team_names, k in non_pod_weekends) a(i,k)
+  penBC:=  sum(p in pod_hosts) (b(p) + c(p))
+  penalties:=  penA + penBC
+
+  !set parameters such that out model
+
+  setparam("XPRS_MAXTIME",cutoff)
+  setparam("XPRS_VERBOSE", true)
+
+  start_time := gettime
+  minimize(penalties)
+
+
+  !--------- Printing Results ------------------
+  if (getprobstat = XPRS_INF) then
+    writeln("Problem is infeasible!")
+  else
+    writeln("Feasible")
+    writeln("run time: ", gettime - start_time)
+    writeln("Penalties: ", getobjval)
+  end-if
+
+  ! prints schedule in the same format as paper
+  fopen("solution_v8.txt",F_OUTPUT)
+    writeln("run time: ", gettime-start_time)
+    writeln("Penalties: ", getobjval)
+    writeln("")
+    forall(i in team_names)do
+      writeln("")
+      writeln("-----  "+i+"   ------")
+      writeln(" w |  vs  |  @ ")
+      writeln("~~~~~~~~~~~~~~~~")
+      forall(w in weekends)do
+        forall(j in team_names)do
+          if(w=7)then
+            ! writeln("pod weekend")
+            forall(ph in pod_hosts)do
+              if(getsol(Y(i,j,ph))=1)then
+                if(i=ph)then
+                  writeln(" ",w," | ", j, " | pod hosts " )
+                else
+                  writeln(" ",w," | ", j, " | away at | ", ph)
+                end-if
+              end-if
+            end-do
+
+          else
+            if(getsol(X(i,j,w))=1)then
+              writeln(" ",w," |  ", j, " | away ") !away alternativley writeln(w," vs ", j, " at ", j)
+            elif(getsol(X(j,i,w))=1)then
+              writeln(" ",w," | ", j, " | home") !home  alternativley writeln(w," vs ", j, " at ", i)
+            end-if
+          end-if
+        end-do
+      end-do
+    end-do
+
+
+
+  fclose(F_OUTPUT)
+
+  forall(i in team_names)do
+    forall(k in non_pod_weekends)do
+      if(getsol(a(i,k))>0)then
+        writeln("team ",i," in week ",k, " ",getsol(a(i,k)))
+      end-if
+    end-do
+  end-do
+  writeln(getsol(penBC))
+
+
+writeln("end model")
+end-model

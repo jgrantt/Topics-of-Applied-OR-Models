@@ -1,0 +1,301 @@
+model SoftBall
+  uses "mmxprs"
+  uses "mmsystem"
+  uses "mmnl"
+
+  ! =========== Model Configuration ===========
+
+  cutoff := 200 ! Seconds untill termination.
+
+  ! Initialisations from ....
+  input_path := "new_input.dat"
+
+  extension_path := "extensions_base2022.dat"
+
+  running_extensions := true
+
+  ! =========== END Model Configuration  ===========
+
+  declarations
+
+    teams = 1..12
+    team_names: SET of string
+
+    num_weeks = 11
+    weekends = 1..num_weeks
+
+
+    ! 1-yes, 0 - no
+    ! pod_hosts: SET of string
+    east_division: SET of string
+    west_division: SET of string
+    cold_weather: SET of string
+    warm_weather: SET of string
+    F_ASC: SET of string
+    F_CSC: SET of string
+    F_CSM: SET of string
+    F_CSUP: SET of string
+    F_FLC: SET of string
+    F_MSC: SET of string
+    F_MSCD: SET of string
+    F_NMHU: SET of string
+    F_RU: SET of string
+    F_UCCS: SET of string
+    F_CCU: SET of string
+    F_BHSU: SET of string
+
+    ! 1- non pod, 0 - pod
+
+    !--- decision variables ----
+
+    !Hosting weekends
+    ! team i @ team j on weekend k
+    X: array(team_names, team_names, weekends) of mpvar
+
+    ! ---- Penalty Variables -----
+
+    ! team i has 2 home games in a row starting in week k
+    a: array(team_names, weekends) of mpvar
+
+  end-declarations
+
+  initialisations from input_path
+    team_names east_division west_division cold_weather warm_weather
+    F_ASC F_CSC F_CSM F_CSUP F_FLC F_MSC F_MSCD F_NMHU F_RU F_UCCS F_CCU F_BHSU
+  end-initialisations
+
+
+  !---- Binary Constraints -------------
+
+  ! team i @ team j on a non-pod weekend k
+  forall(i in team_names) do
+      forall(j in team_names) do
+        forall(k in weekends ) do
+          X(i,j,k) is_binary
+          end-do
+      end-do
+  end-do
+
+
+  ! team i hosts two games in a row, starting from non-pod weekend k
+  forall(i in team_names, k in weekends) do
+    a(i,k) is_binary
+  end-do
+
+
+  ! ----- The Constraints ----------------
+
+
+  ! (1)  Each nonpod weekend, a team plays exactly one other team, either home or away
+  forall(k in weekends) do
+    forall(i in team_names) do
+      sum(j in team_names | i<>j) X(i,j,k) + sum(j in team_names | i<>j) X(j,i,k) = 1
+    end-do
+  end-do
+
+  ! (2) Each team plays every other team once during the season, either at home or away
+  forall(i in team_names) do
+    forall( j in team_names | i<>j) do
+      sum(k in weekends) (X(i,j,k) + X(j,i,k)) = 1
+    end-do
+  end-do
+
+  ! (3) A team either starts or finishes the season at home
+  forall (j in team_names) do
+    sum(i in team_names | i<>j) (X(i,j,1) + X(i,j,num_weeks)) =1
+  end-do
+
+
+  ! (4) No more than six home games for a team
+  forall(i in team_names) do
+    sum(j in team_names, k in weekends | i<>j) X(j,i,k)  <= 6
+  end-do
+
+  ! (5)  For the first four weekends, force cold weather schools to play away at least twice
+  forall (i in cold_weather) do
+    sum(j in warm_weather)( X(i,j,1) + X(i,j,2) + X(i,j,3) + X(i,j,4) ) >= 2
+  end-do
+
+  ! (6) Warm weather schools must play at home or at another warm weather school at least twice
+  forall(i in warm_weather) do
+    sum(j in team_names | i<>j) (X(j,i,1) + X(j,i,2) +X(j,i,3) + X(j,i,4)) + sum(j in warm_weather | i<>j)(X(i,j,1) + X(i,j,2) + X(i,j,3)+ X(i,j,4)) >=2
+  end-do
+
+  ! (7) No 2 far away games in a consequitve  weekend
+  forall(k in 1..(num_weeks-1)) do
+    sum(j in F_ASC)( X("ASC", j, k) + X("ASC", j, k+1)) <= 1
+  end-do
+
+  forall(k in 1..(num_weeks-1)) do
+    sum(j in F_CSC)( X("CSC", j, k) + X("CSC", j, k+1)) <= 1
+  end-do
+
+  forall(k in 1..(num_weeks-1)) do
+    sum(j in F_CSM)( X("CSM", j, k) + X("CSM", j, k+1))<= 1
+  end-do
+
+  forall(k in 1..(num_weeks-1)) do
+    sum(j in F_CSUP)( X("CSUP", j, k) + X("CSUP", j, k+1)) <= 1
+  end-do
+
+  forall(k in 1..(num_weeks-1)) do
+    sum(j in F_FLC)( X("FLC", j, k) + X("FLC", j, k+1))<= 1
+  end-do
+
+  forall(k in 1..(num_weeks-1)) do
+    sum(j in F_MSC)( X("MSC", j, k) + X("MSC", j, k+1))<= 1
+  end-do
+
+  forall(k in 1..(num_weeks-1)) do
+    sum(j in F_MSCD)( X("MSCD", j, k) + X("MSCD", j, k+1))<= 1
+  end-do
+
+  forall(k in 1..(num_weeks-1)) do
+    sum(j in F_NMHU)( X("NMHU", j, k) + X("NMHU", j, k+1))<= 1
+  end-do
+
+  forall(k in 1..(num_weeks-1)) do
+    sum(j in F_RU)( X("RU", j, k) + X("RU", j, k+1))<= 1
+  end-do
+
+   forall(k in 1..(num_weeks-1)) do
+    sum(j in F_UCCS)( X("UCCS", j, k) + X("UCCS", j, k+1))<= 1
+  end-do
+
+   forall(k in 1..(num_weeks-1)) do
+    sum(j in F_CCU)( X("CCU", j, k) + X("CCU", j, k+1))<= 1
+  end-do
+
+ forall(k in 1..(num_weeks-1)) do
+    sum(j in F_BHSU)( X("BHSU", j, k) + X("BHSU", j, k+1))<= 1
+  end-do
+
+  ! (8) Teams play home at least once in 3 weeks
+  forall(k in 1..(num_weeks-2)) do
+    forall(i in team_names) do
+      sum(j in team_names | i<>j)(X(j,i,k) + X(j,i,k+1) + X(j,i,k+2))  >= 1
+    end-do
+  end-do
+
+  ! =========== Extensions ========================
+
+  declarations
+    ! 1 - we want this preference, 0 - we prefer not to
+    Home_Preference_None: array(team_names,weekends) of real
+
+    ! 1 - unavailable at home, must play away
+    Home_Unavailibility_None: array(team_names,weekends) of real
+
+
+    ! Budget declarations
+    Budget: array(team_names) of real
+    Travel_Cost_Matrix: array(team_names,team_names) of real
+
+    ! Decsion variables declarations
+    hp_penalty: array(team_names, weekends) of mpvar
+    ap_penalty: array(team_names, weekends) of mpvar
+  end-declarations
+
+  if(running_extensions)then
+    writeln("Running Extensions")
+
+    initialisations from extension_path
+      Home_Preference_None Home_Unavailibility_None Travel_Cost_Matrix
+      Budget as "Travel_budget_7"
+    end-initialisations
+
+    ! --- Unavailability Constraints
+    forall(k in weekends)do
+      forall(j in team_names)do
+        sum(i in team_names | i<> j)( X(j,i,k) + Home_Preference_None(j,k) ) <= hp_penalty(j,k) + 1
+      end-do
+    end-do
+
+    ! i has to play away if unavailibility equals 1
+    forall(k in weekends)do
+      forall(j in team_names)do
+        sum(i in team_names | i<>j) X(i,j,k) >= Home_Unavailibility_Half(j,k)
+      end-do
+    end-do
+
+    ! - Budget Constraint for away games
+    forall(i in team_names)do
+      sum(k in weekends, j in team_names | i<> j) (X(i,j,k) *Travel_Cost_Matrix(j,i)) <= Budget(i)
+    end-do
+
+
+  end-if
+  ! ======== END EXTENSIONSIONS ==========
+
+  ! ============ Objective Function --------------------------------------
+
+  !Penalize j hosting two home games in a row
+  forall(k in 1..(num_weeks-1)) do
+    forall(j in team_names) do
+      sum(i in team_names | i <> j)(X(i,j,k) + X(i,j,k+1)) <= a(j,k) + 1
+    end-do
+  end-do
+
+
+  penA:= sum(i in team_names, k in weekends) a(i,k)
+  penalties:=  penA !+ penBC
+
+  !set parameters such that out model
+
+  setparam("XPRS_MAXTIME",cutoff)
+  setparam("XPRS_VERBOSE", true)
+
+  start_time := gettime
+  minimize(penalties)
+
+
+  !--------- Printing Results ------------------
+  if (getprobstat = XPRS_INF) then
+    writeln("Problem is infeasible!")
+  else
+    writeln("Feasible")
+    writeln("run time: ", gettime - start_time)
+    writeln("Penalties: ", getobjval)
+  end-if
+
+
+  ! prints schedule in the same format as paper
+  fopen("solution_ext.txt",F_OUTPUT)
+
+    forall(i in team_names)do
+      writeln("")
+      writeln("-----  "+i+"   ------")
+      writeln(" w |  vs  |  @ ")
+      writeln("~~~~~~~~~~~~~~~~")
+
+      forall(k in weekends)do
+        forall(j in team_names)do
+          if(getsol(X(i,j,k))=1 )then
+            writeln(" ",k," |  ", j, " | away", " Travel Cost: ", Travel_Cost_Matrix(j,i))
+
+          elif(getsol(X(j,i,k))=1)then
+            writeln(" ",k," | ", j, " | home")
+
+          end-if
+        end-do
+      end-do
+
+      writeln("Total Travel Costs: ",  sum(k in weekends, j in team_names | i<> j) getsol((X(i,j,k)) *Travel_Cost_Matrix(j,i)))
+    end-do
+
+    !============================
+
+
+  fclose(F_OUTPUT)
+
+  forall(i in team_names)do
+    forall(k in weekends)do
+      if(getsol(a(i,k))>0)then
+        writeln("team ",i," in week ",k, " ",getsol(a(i,k)))
+      end-if
+    end-do
+  end-do
+
+
+writeln("end model")
+end-model
