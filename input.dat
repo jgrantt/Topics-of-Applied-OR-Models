@@ -1,0 +1,25 @@
+team_names :[ "ASC" "CSC" "CSM" "CSUP" "FLC" "MSC" "MSCD" "NMHU" "RU" "UCCS" "UNK" "WNMU"]
+
+pod_hosts: [ "ASC" "CSC" "CSM" "CSUP" "FLC" "MSC" "MSCD" "NMHU" "RU" "UCCS" "UNK" "WNMU"]
+
+east_division: ["CSC" "CSM" "MSCD" "RU" "UCCS" "UNK"]
+west_division: ["ASC" "CSUP" "FLC" "MSC" "NMHU" "WNMU"]
+
+cold_weather: ["ASC" "CSC" "CSM" "UCCS" "UNK"]
+warm_weather: ["CSUP" "FLC" "MSC" "MSCD" "NMHU" "RU" "WNMU"]
+
+non_pod_weekends: [1 2 3 4 5 6 8 9 10]
+
+
+F_ASC: ["MSC" "WNMU" "CSC" "UNK"]
+F_CSC: ["ASC" "MSC" "NMHU" "FLC" "WNMU"]
+F_CSM: ["CSC" "NMHU" "UNK" "FLC" "WNMU"]
+F_CSUP: ["FLC" "MSC" "UNK" "WNMU"]
+F_FLC: ["WNMU" "CSC" "UNK"]
+F_MSC: ["NMHU" "CSC" "UNK" "WNMU"]
+F_MSCD: ["CSC" "NMHU" "UNK" "FLC" "WNMU"]
+F_NMHU: ["MSC" "CSC" "UNK"]
+F_RU: ["MSC" "CSC" "UNK" "FLC" "NMHU" "WNMU"]
+F_UCCS: ["MSC" "CSC" "FLC" "UNK" "WNMU"]
+F_UNK: ["ASC" "MSC" "NMHU" "FLC" "WNMU"]
+F_WNMU: ["MSCD" "RU" "MSC" "CSM" "CSC" "UNK"]
